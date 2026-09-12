@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>換-KAN- 拡張子一括変換ツール</title>
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="app-header">
+  <div class="header-mark" aria-hidden="true">換</div>
+  <div class="header-text">
+    <h1>換<span class="ruby">-KAN-</span></h1>
+    <p class="tagline">拡張子だけを、静かに置き換える。</p>
+  </div>
+</header>
+
+<div id="unsupported-banner" class="banner banner--warning" hidden>
+  <strong>このブラウザでは実行できません。</strong>
+  換-KAN- はローカルフォルダの読み書きに File System Access API を使用しています。
+  Chrome または Edge（デスクトップ版）で開いてください。
+</div>
+
+<main class="layout">
+
+  <section class="panel" aria-labelledby="folders-heading">
+    <div class="panel-head">
+      <h2 id="folders-heading">フォルダ</h2>
+      <button id="add-folder-btn" class="btn btn--accent" type="button">＋ フォルダ追加</button>
+    </div>
+    <ul id="folder-list" class="item-list" aria-live="polite"></ul>
+    <p id="folder-empty" class="empty-note">まだフォルダが登録されていません。</p>
+  </section>
+
+  <section class="panel" aria-labelledby="rules-heading">
+    <div class="panel-head">
+      <h2 id="rules-heading">変換ルール</h2>
+      <button id="add-rule-btn" class="btn btn--accent" type="button">＋ ルール追加</button>
+    </div>
+    <ul id="rule-list" class="item-list" aria-live="polite"></ul>
+    <p id="rule-empty" class="empty-note">まだルールが登録されていません。</p>
+  </section>
+
+  <section class="panel panel--wide" aria-labelledby="preview-heading">
+    <div class="panel-head">
+      <h2 id="preview-heading">プレビュー</h2>
+      <div class="panel-head-actions">
+        <span id="preview-summary" class="summary-text">未更新</span>
+        <button id="refresh-preview-btn" class="btn" type="button">プレビュー更新</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table id="preview-table">
+        <thead>
+          <tr>
+            <th>フォルダ</th>
+            <th>現在の名前</th>
+            <th></th>
+            <th>変更後</th>
+            <th>状態</th>
+          </tr>
+        </thead>
+        <tbody id="preview-body"></tbody>
+      </table>
+      <p id="preview-empty" class="empty-note">フォルダとルールを登録して「プレビュー更新」を押してください。</p>
+    </div>
+  </section>
+
+  <section class="action-bar" aria-label="実行操作">
+    <button id="execute-btn" class="btn btn--primary" type="button" disabled>実行</button>
+    <button id="undo-btn" class="btn" type="button" disabled>↶ Undo</button>
+    <button id="redo-btn" class="btn" type="button" disabled>↷ Redo</button>
+  </section>
+
+  <details class="panel log-panel">
+    <summary>変更ログ</summary>
+    <ul id="log-list" class="log-list"></ul>
+  </details>
+
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>

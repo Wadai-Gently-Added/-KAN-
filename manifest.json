@@ -1,0 +1,10 @@
+{
+  "name": "換-KAN- 拡張子一括変換ツール",
+  "short_name": "換-KAN-",
+  "description": "複数フォルダの拡張子を安全に一括変換するローカル完結ツール",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#1a1918",
+  "theme_color": "#35597a",
+  "icons": []
+}
