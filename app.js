@@ -25,6 +25,7 @@ const el = {
   ruleList: document.getElementById("rule-list"),
   ruleEmpty: document.getElementById("rule-empty"),
   addRuleBtn: document.getElementById("add-rule-btn"),
+  selectAllCheckbox: document.getElementById("select-all-checkbox"),
   previewBody: document.getElementById("preview-body"),
   previewEmpty: document.getElementById("preview-empty"),
   previewSummary: document.getElementById("preview-summary"),
@@ -87,7 +88,11 @@ async function addFolder() {
 
 function removeFolder(id) {
   state.folders = state.folders.filter((f) => f.id !== id);
+  // フォルダを削除したら、そのフォルダに紐づくプレビュー行も一緒に消す
+  // （プレビューは「更新」時点のスナップショットなので、放置すると古い行が残り続ける）
+  state.preview = state.preview.filter((item) => item.folderId !== id);
   renderFolders();
+  renderPreview();
 }
 
 function renderFolders() {
@@ -302,6 +307,7 @@ async function buildPreview() {
           dirHandle: file.dirHandle,
           fileHandle: file.handle,
           status: collides ? "collision" : "pending",
+          selected: !collides, // 変更予定は初期状態で選択済みにしておく
         });
       }
     }
@@ -328,13 +334,32 @@ function renderPreview() {
   el.previewEmpty.hidden = state.preview.length > 0;
 
   const counts = { pending: 0, collision: 0, done: 0, error: 0 };
+  let selectedCount = 0;
+  let pendingCount = 0;
 
   for (const item of state.preview) {
     counts[item.status] = (counts[item.status] || 0) + 1;
+    if (item.status === "pending") {
+      pendingCount += 1;
+      if (item.selected) selectedCount += 1;
+    }
 
     const tr = document.createElement("tr");
     if (item.status === "collision" || item.status === "error") tr.classList.add("status-collision");
     if (item.status === "done") tr.classList.add("status-done");
+
+    const tdCheck = document.createElement("td");
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = Boolean(item.selected);
+    checkbox.disabled = item.status !== "pending";
+    checkbox.setAttribute("aria-label", `${item.oldName} を実行対象に含める`);
+    checkbox.addEventListener("change", () => {
+      item.selected = checkbox.checked;
+      updateSelectAllCheckboxState();
+      updateExecuteButtonState();
+    });
+    tdCheck.appendChild(checkbox);
 
     const tdFolder = document.createElement("td");
     tdFolder.textContent = item.folderName;
@@ -354,16 +379,32 @@ function renderPreview() {
     badge.textContent = statusLabel(item.status);
     tdStatus.appendChild(badge);
 
-    tr.append(tdFolder, tdOld, tdArrow, tdNew, tdStatus);
+    tr.append(tdCheck, tdFolder, tdOld, tdArrow, tdNew, tdStatus);
     el.previewBody.appendChild(tr);
   }
 
   const total = state.preview.length;
   el.previewSummary.textContent = total === 0
     ? "対象なし"
-    : `対象 ${total}件 / 変更可能 ${counts.pending}件 / 衝突 ${counts.collision}件`;
+    : `対象 ${total}件 / 変更可能 ${counts.pending}件（選択中 ${selectedCount}件）/ 衝突 ${counts.collision}件`;
 
-  el.executeBtn.disabled = counts.pending === 0;
+  updateSelectAllCheckboxState(pendingCount, selectedCount);
+  updateExecuteButtonState();
+}
+
+function updateSelectAllCheckboxState(pendingCount, selectedCount) {
+  if (pendingCount === undefined) {
+    pendingCount = state.preview.filter((i) => i.status === "pending").length;
+    selectedCount = state.preview.filter((i) => i.status === "pending" && i.selected).length;
+  }
+  el.selectAllCheckbox.disabled = pendingCount === 0;
+  el.selectAllCheckbox.checked = pendingCount > 0 && selectedCount === pendingCount;
+  el.selectAllCheckbox.indeterminate = selectedCount > 0 && selectedCount < pendingCount;
+}
+
+function updateExecuteButtonState() {
+  const hasSelectedPending = state.preview.some((i) => i.status === "pending" && i.selected);
+  el.executeBtn.disabled = !hasSelectedPending;
 }
 
 /* ============================================
@@ -387,7 +428,7 @@ async function renameOne(dirHandle, oldName, newName) {
 }
 
 async function executeAll() {
-  const targets = state.preview.filter((i) => i.status === "pending");
+  const targets = state.preview.filter((i) => i.status === "pending" && i.selected);
   if (targets.length === 0) return;
 
   el.executeBtn.disabled = true;
@@ -487,6 +528,13 @@ function updateUndoRedoButtons() {
 /* ============================================
    イベント登録・初期化
    ============================================ */
+el.selectAllCheckbox.addEventListener("change", () => {
+  const checked = el.selectAllCheckbox.checked;
+  for (const item of state.preview) {
+    if (item.status === "pending") item.selected = checked;
+  }
+  renderPreview();
+});
 el.addFolderBtn.addEventListener("click", addFolder);
 el.addRuleBtn.addEventListener("click", addRule);
 el.refreshPreviewBtn.addEventListener("click", buildPreview);

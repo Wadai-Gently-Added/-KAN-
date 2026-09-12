@@ -225,6 +225,8 @@ body {
 
 /* ---------- preview table ---------- */
 .table-wrap { overflow-x: auto; }
+.col-check { width: 36px; }
+tbody td:first-child { padding-right: 2px; }
 table {
   width: 100%;
   border-collapse: collapse;

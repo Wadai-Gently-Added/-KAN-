@@ -1,6 +1,13 @@
 # PROJECT_STRUCTURE.md — 換-KAN-
 
-最終更新：2026-09-12（v1.0.0 初版）
+最終更新：2026-09-13（v1.0.1）
+
+## v1.0.1での変更点
+
+- **修正：** フォルダを削除してもプレビュー表に古い行が残るバグを修正
+  （`removeFolder`が`state.preview`側を更新していなかったため）
+- **追加：** プレビュー各行にチェックボックスを追加し、実行対象を個別選択できるように。
+  ヘッダーに全選択トグルつき（衝突/実行済み/失敗の行はチェック不可）
 
 ```
 kan-tool/
@@ -11,7 +18,7 @@ kan-tool/
 │   ├─ フォルダ管理        … addFolder / removeFolder / renderFolders
 │   ├─ ルール管理          … addRule / removeRule / renderRules / ruleValidationMessage
 │   ├─ 探索                … scanDirectory（再帰・深さ制限つき）
-│   ├─ プレビュー          … buildPreview / renderPreview
+│   ├─ プレビュー          … buildPreview / renderPreview（行ごとの selected フラグ、全選択トグル）
 │   ├─ 実行                … renameOne（作成→書込→検証→削除）/ executeAll
 │   └─ Undo/Redo           … undoBatch / undoLast / redoLast
 ├─ manifest.json         … PWAマニフェスト（アイコン未設定＝要追加）
