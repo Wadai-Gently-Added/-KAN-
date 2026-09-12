@@ -78,6 +78,7 @@ async function addFolder() {
       enabled: true,
       includeSubfolders: false,
       depth: 0,
+      invalid: false,
     });
     log(`フォルダを追加: ${handle.name}`);
     renderFolders();
@@ -115,6 +116,15 @@ function renderFolders() {
     const nameSpan = document.createElement("span");
     nameSpan.className = "name";
     nameSpan.textContent = folder.name;
+
+    if (folder.invalid) {
+      const badge = document.createElement("span");
+      badge.textContent = "⚠ 再登録が必要";
+      badge.style.color = "var(--clay-500)";
+      badge.style.fontSize = "12px";
+      nameSpan.appendChild(document.createElement("br"));
+      nameSpan.appendChild(badge);
+    }
 
     const subLabel = document.createElement("label");
     const subCheckbox = document.createElement("input");
@@ -284,8 +294,17 @@ async function buildPreview() {
       let files;
       try {
         files = await scanDirectory(folder.handle, 0, maxDepth, "");
+        folder.invalid = false;
       } catch (e) {
-        log(`探索に失敗: ${folder.name} (${e.message})`, "error");
+        if (e.name === "NotFoundError") {
+          folder.invalid = true;
+          log(
+            `フォルダが見つかりません: ${folder.name} — フォルダが削除・再作成された可能性があります（例：圧縮ファイルの再展開）。一覧から削除して「＋フォルダ追加」から選び直してください。`,
+            "error"
+          );
+        } else {
+          log(`探索に失敗: ${folder.name} (${e.message})`, "error");
+        }
         continue;
       }
 
@@ -316,6 +335,7 @@ async function buildPreview() {
     el.refreshPreviewBtn.textContent = "プレビュー更新";
   }
 
+  renderFolders();
   renderPreview();
 }
 
