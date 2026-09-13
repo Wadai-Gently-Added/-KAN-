@@ -112,7 +112,8 @@ function renderFolders() {
 
   for (const folder of state.folders) {
     const li = document.createElement("li");
-    li.className = "item-row";
+    li.className = "item-row folder-row";
+    li.style.setProperty("--folder-hue", folder.hue);
 
     const enabledLabel = document.createElement("label");
     const enabledCheckbox = document.createElement("input");
@@ -184,13 +185,43 @@ function renderFolders() {
 /* ============================================
    ルール管理
    ============================================ */
+const RULES_STORAGE_KEY = "kan-tool-rules-v1";
+
+function saveRulesToStorage() {
+  try {
+    const data = state.rules.map((r) => ({ from: r.from, to: r.to, enabled: r.enabled }));
+    localStorage.setItem(RULES_STORAGE_KEY, JSON.stringify(data));
+  } catch (e) {
+    // localStorageが使えない環境（プライベートモード等）では黙って諦める
+  }
+}
+
+function loadRulesFromStorage() {
+  try {
+    const raw = localStorage.getItem(RULES_STORAGE_KEY);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    if (!Array.isArray(data)) return;
+    state.rules = data.map((r) => ({
+      id: nextId(),
+      from: typeof r.from === "string" ? r.from : "",
+      to: typeof r.to === "string" ? r.to : "",
+      enabled: r.enabled !== false,
+    }));
+  } catch (e) {
+    // 保存データが壊れていた場合は無視して空の状態から始める
+  }
+}
+
 function addRule() {
-  state.rules.push({ id: nextId(), from: "", to: "" });
+  state.rules.push({ id: nextId(), from: "", to: "", enabled: true });
+  saveRulesToStorage();
   renderRules();
 }
 
 function removeRule(id) {
   state.rules = state.rules.filter((r) => r.id !== id);
+  saveRulesToStorage();
   renderRules();
 }
 
@@ -212,17 +243,39 @@ function renderRules() {
     const li = document.createElement("li");
     li.className = "item-row";
 
+    const enabledLabel = document.createElement("label");
+    const enabledCheckbox = document.createElement("input");
+    enabledCheckbox.type = "checkbox";
+    enabledCheckbox.checked = rule.enabled;
+    enabledCheckbox.title = "このルールを今回の変換に使う";
+    enabledCheckbox.addEventListener("change", () => {
+      rule.enabled = enabledCheckbox.checked;
+      saveRulesToStorage();
+    });
+    enabledLabel.append(enabledCheckbox);
+
     const fromInput = document.createElement("input");
     fromInput.type = "text";
     fromInput.placeholder = "ts";
     fromInput.value = rule.from;
     fromInput.addEventListener("input", () => {
       rule.from = fromInput.value;
+      saveRulesToStorage();
     });
 
-    const arrow = document.createElement("span");
-    arrow.className = "rule-arrow";
-    arrow.textContent = "→";
+    const reverseBtn = document.createElement("button");
+    reverseBtn.type = "button";
+    reverseBtn.className = "btn btn--reverse";
+    reverseBtn.title = "変換元と変換先を入れ替える";
+    reverseBtn.setAttribute("aria-label", "変換元と変換先を入れ替える");
+    reverseBtn.textContent = "⇄";
+    reverseBtn.addEventListener("click", () => {
+      const tmp = rule.from;
+      rule.from = rule.to;
+      rule.to = tmp;
+      saveRulesToStorage();
+      renderRules();
+    });
 
     const toInput = document.createElement("input");
     toInput.type = "text";
@@ -230,6 +283,7 @@ function renderRules() {
     toInput.value = rule.to;
     toInput.addEventListener("input", () => {
       rule.to = toInput.value;
+      saveRulesToStorage();
     });
 
     const warning = document.createElement("span");
@@ -244,13 +298,13 @@ function renderRules() {
     removeBtn.textContent = "削除";
     removeBtn.addEventListener("click", () => removeRule(rule.id));
 
-    li.append(fromInput, arrow, toInput, warning, removeBtn);
+    li.append(enabledLabel, fromInput, reverseBtn, toInput, warning, removeBtn);
     el.ruleList.appendChild(li);
   }
 }
 
 function activeValidRules() {
-  return state.rules.filter((r) => !ruleValidationMessage(r));
+  return state.rules.filter((r) => r.enabled && !ruleValidationMessage(r));
 }
 
 /* ============================================
@@ -661,6 +715,7 @@ el.undoBtn.addEventListener("click", undoLast);
 el.redoBtn.addEventListener("click", redoLast);
 
 checkSupport();
+loadRulesFromStorage();
 renderFolders();
 renderRules();
 renderPreview();

@@ -102,6 +102,35 @@ body {
   .app-header { padding: 20px 16px; }
 }
 
+@media (max-width: 560px) {
+  .item-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+  .item-row .name {
+    order: -1;
+    margin-bottom: 2px;
+  }
+  .item-row select,
+  .item-row input[type="text"] {
+    width: 100%;
+  }
+  .panel-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .panel-head-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+  table { font-size: 12px; }
+  thead th, tbody td { padding: 6px 6px; }
+  .header-mark { width: 44px; height: 44px; font-size: 28px; }
+  .header-text h1 { font-size: 18px; }
+}
+
 /* ---------- panel ---------- */
 .panel {
   background: var(--ink-800);
@@ -213,9 +242,8 @@ body {
   opacity: 0.85;
   white-space: nowrap;
 }
-.rule-arrow {
+.btn--reverse {
   color: var(--indigo-400);
-  font-family: var(--font-mono);
 }
 .empty-note {
   font-size: 13px;
@@ -284,6 +312,19 @@ tbody tr.status-done { color: var(--moss-500); }
 }
 .preview-row td:first-child {
   border-left: 3px solid hsl(var(--folder-hue) 55% 48%);
+}
+
+/* フォルダ一覧も、プレビューのグループ見出しと同じ色帯で揃える */
+.item-row.folder-row {
+  background: hsl(var(--folder-hue) 32% 15%);
+  border-color: hsl(var(--folder-hue) 35% 28%);
+  border-left: 4px solid hsl(var(--folder-hue) 55% 48%);
+}
+
+.btn--reverse {
+  padding: 6px 9px;
+  font-size: 14px;
+  line-height: 1;
 }
 
 /* ---------- action bar ---------- */
