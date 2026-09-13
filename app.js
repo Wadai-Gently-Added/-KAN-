@@ -70,7 +70,7 @@ function splitExt(filename) {
    ============================================ */
 async function addFolder() {
   try {
-    const handle = await window.showDirectoryPicker();
+    const handle = await window.showDirectoryPicker({ mode: "readwrite" });
     state.folders.push({
       id: nextId(),
       name: handle.name,
@@ -272,6 +272,17 @@ async function fileExists(dirHandle, name) {
   }
 }
 
+async function ensureReadWritePermission(handle) {
+  const opts = { mode: "readwrite" };
+  try {
+    if ((await handle.queryPermission(opts)) === "granted") return true;
+    if ((await handle.requestPermission(opts)) === "granted") return true;
+  } catch (e) {
+    // queryPermission/requestPermission 自体が未対応の場合はここに来る
+  }
+  return false;
+}
+
 /* ============================================
    プレビュー
    ============================================ */
@@ -452,6 +463,22 @@ async function executeAll() {
   if (targets.length === 0) return;
 
   el.executeBtn.disabled = true;
+
+  // 書き込み権限は実行の一番最初にまとめて確認する。
+  // 複数フォルダを順番に処理する途中で確認すると、ユーザー操作の有効時間が切れて失敗しやすいため。
+  const uniqueDirHandles = [];
+  for (const item of targets) {
+    if (!uniqueDirHandles.includes(item.dirHandle)) uniqueDirHandles.push(item.dirHandle);
+  }
+  for (const dirHandle of uniqueDirHandles) {
+    const granted = await ensureReadWritePermission(dirHandle);
+    if (!granted) {
+      log("書き込み権限が確認できませんでした。「実行」をもう一度押してください。", "error");
+      el.executeBtn.disabled = false;
+      return;
+    }
+  }
+
   const batchItems = [];
 
   for (const item of targets) {
@@ -486,6 +513,18 @@ async function executeAll() {
    Undo / Redo
    ============================================ */
 async function undoBatch(batch) {
+  const uniqueDirHandles = [];
+  for (const item of batch.items) {
+    if (!uniqueDirHandles.includes(item.dirHandle)) uniqueDirHandles.push(item.dirHandle);
+  }
+  for (const dirHandle of uniqueDirHandles) {
+    const granted = await ensureReadWritePermission(dirHandle);
+    if (!granted) {
+      log("書き込み権限が確認できませんでした。「Undo」をもう一度押してください。", "error");
+      return [];
+    }
+  }
+
   const reversed = [];
   for (const item of batch.items) {
     const collides = await fileExists(item.dirHandle, item.oldName);
@@ -518,6 +557,20 @@ async function undoLast() {
 async function redoLast() {
   const batch = state.redoStack.pop();
   if (!batch) return;
+
+  const uniqueDirHandles = [];
+  for (const item of batch.items) {
+    if (!uniqueDirHandles.includes(item.dirHandle)) uniqueDirHandles.push(item.dirHandle);
+  }
+  for (const dirHandle of uniqueDirHandles) {
+    const granted = await ensureReadWritePermission(dirHandle);
+    if (!granted) {
+      log("書き込み権限が確認できませんでした。「Redo」をもう一度押してください。", "error");
+      state.redoStack.push(batch);
+      return;
+    }
+  }
+
   const reapplied = [];
   for (const item of batch.items) {
     const collides = await fileExists(item.dirHandle, item.newName);
