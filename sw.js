@@ -1,4 +1,4 @@
-const CACHE_NAME = "kan-tool-v1";
+const CACHE_NAME = "kan-tool-v2"; // 更新のたびにここを上げると、古いキャッシュを確実に破棄できる
 const ASSETS = ["./", "./index.html", "./styles.css", "./app.js", "./manifest.json"];
 
 self.addEventListener("install", (event) => {
@@ -17,8 +17,16 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
+// ネットワーク優先：オンライン中は常に最新を取りに行き、取得できた分だけキャッシュを更新する。
+// オフライン時のみキャッシュにフォールバックする（開発中に更新が反映されない問題を避けるため）。
 self.addEventListener("fetch", (event) => {
   event.respondWith(
-    caches.match(event.request).then((cached) => cached || fetch(event.request))
+    fetch(event.request)
+      .then((response) => {
+        const responseClone = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseClone));
+        return response;
+      })
+      .catch(() => caches.match(event.request))
   );
 });
