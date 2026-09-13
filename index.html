@@ -39,6 +39,14 @@
       <h2 id="rules-heading">変換ルール</h2>
       <button id="add-rule-btn" class="btn btn--accent" type="button">＋ ルール追加</button>
     </div>
+    <div class="preset-bar">
+      <select id="preset-select" aria-label="プリセットを選択">
+        <option value="">プリセットを選択…</option>
+      </select>
+      <button id="preset-apply-btn" class="btn" type="button">適用</button>
+      <button id="preset-save-btn" class="btn btn--accent" type="button">現在を保存</button>
+      <button id="preset-delete-btn" class="btn--danger-text" type="button">削除</button>
+    </div>
     <ul id="rule-list" class="item-list" aria-live="polite"></ul>
     <p id="rule-empty" class="empty-note">まだルールが登録されていません。</p>
   </section>

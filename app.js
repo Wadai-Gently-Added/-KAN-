@@ -8,6 +8,7 @@
 const state = {
   folders: [],   // { id, name, handle, enabled, includeSubfolders, depth }
   rules: [],     // { id, from, to }
+  presets: [],   // { id, name, rules: [{ from, to, enabled }] }
   preview: [],   // 直近のプレビュー結果
   previewNote: "", // プレビューが0件の時に表示する理由メッセージ
   history: [],   // 実行済みバッチのスタック（Undo用）
@@ -35,6 +36,10 @@ const el = {
   ruleList: document.getElementById("rule-list"),
   ruleEmpty: document.getElementById("rule-empty"),
   addRuleBtn: document.getElementById("add-rule-btn"),
+  presetSelect: document.getElementById("preset-select"),
+  presetApplyBtn: document.getElementById("preset-apply-btn"),
+  presetSaveBtn: document.getElementById("preset-save-btn"),
+  presetDeleteBtn: document.getElementById("preset-delete-btn"),
   selectAllCheckbox: document.getElementById("select-all-checkbox"),
   previewBody: document.getElementById("preview-body"),
   previewEmpty: document.getElementById("preview-empty"),
@@ -331,6 +336,119 @@ function renderRules() {
 
 function activeValidRules() {
   return state.rules.filter((r) => r.enabled && !ruleValidationMessage(r));
+}
+
+/* ============================================
+   プリセット（ルールセットの保存・呼び出し）
+   ============================================ */
+const PRESETS_STORAGE_KEY = "kan-tool-presets-v1";
+
+function savePresetsToStorage() {
+  try {
+    localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(state.presets));
+  } catch (e) {
+    // localStorageが使えない環境では黙って諦める
+  }
+}
+
+function loadPresetsFromStorage() {
+  try {
+    const raw = localStorage.getItem(PRESETS_STORAGE_KEY);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    if (!Array.isArray(data)) return;
+    state.presets = data.filter((p) => p && typeof p.name === "string" && Array.isArray(p.rules));
+  } catch (e) {
+    // 保存データが壊れていた場合は無視
+  }
+}
+
+function renderPresets() {
+  const currentValue = el.presetSelect.value;
+  el.presetSelect.innerHTML = "";
+
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = state.presets.length === 0 ? "保存済みのプリセットはありません" : "プリセットを選択…";
+  el.presetSelect.appendChild(placeholder);
+
+  for (const preset of state.presets) {
+    const opt = document.createElement("option");
+    opt.value = preset.id;
+    opt.textContent = `${preset.name}（${preset.rules.length}件）`;
+    el.presetSelect.appendChild(opt);
+  }
+
+  // 直前に選ばれていたプリセットがまだ存在するなら選択状態を維持する
+  if (state.presets.some((p) => p.id === currentValue)) {
+    el.presetSelect.value = currentValue;
+  }
+}
+
+function applySelectedPreset() {
+  const id = el.presetSelect.value;
+  if (!id) {
+    log("適用するプリセットを選んでください。", "error");
+    return;
+  }
+  const preset = state.presets.find((p) => p.id === id);
+  if (!preset) return;
+
+  state.rules = preset.rules.map((r) => ({
+    id: nextId(),
+    from: r.from || "",
+    to: r.to || "",
+    enabled: r.enabled !== false,
+  }));
+  saveRulesToStorage();
+  renderRules();
+  log(`プリセット「${preset.name}」を適用しました（${state.rules.length}件）`, "success");
+}
+
+function saveCurrentAsPreset() {
+  if (state.rules.length === 0) {
+    log("保存するルールがありません。先にルールを登録してください。", "error");
+    return;
+  }
+  const name = window.prompt("プリセット名を入力してください：", "");
+  if (name === null) return; // キャンセル
+  const trimmed = name.trim();
+  if (!trimmed) {
+    log("プリセット名が空だったため、保存をキャンセルしました。", "error");
+    return;
+  }
+
+  const rulesSnapshot = state.rules.map((r) => ({ from: r.from, to: r.to, enabled: r.enabled }));
+  const existing = state.presets.find((p) => p.name === trimmed);
+
+  if (existing) {
+    existing.rules = rulesSnapshot;
+    savePresetsToStorage();
+    renderPresets();
+    el.presetSelect.value = existing.id;
+    log(`プリセット「${trimmed}」を上書き保存しました`, "success");
+  } else {
+    const preset = { id: nextId(), name: trimmed, rules: rulesSnapshot };
+    state.presets.push(preset);
+    savePresetsToStorage();
+    renderPresets();
+    el.presetSelect.value = preset.id;
+    log(`プリセット「${trimmed}」を新規保存しました`, "success");
+  }
+}
+
+function deleteSelectedPreset() {
+  const id = el.presetSelect.value;
+  if (!id) {
+    log("削除するプリセットを選んでください。", "error");
+    return;
+  }
+  const preset = state.presets.find((p) => p.id === id);
+  if (!preset) return;
+  state.presets = state.presets.filter((p) => p.id !== id);
+  savePresetsToStorage();
+  renderPresets();
+  log(`プリセット「${preset.name}」を削除しました`);
 }
 
 /* ============================================
@@ -749,6 +867,9 @@ el.selectAllCheckbox.addEventListener("change", () => {
 });
 el.addFolderBtn.addEventListener("click", addFolder);
 el.addRuleBtn.addEventListener("click", addRule);
+el.presetApplyBtn.addEventListener("click", applySelectedPreset);
+el.presetSaveBtn.addEventListener("click", saveCurrentAsPreset);
+el.presetDeleteBtn.addEventListener("click", deleteSelectedPreset);
 el.refreshPreviewBtn.addEventListener("click", buildPreview);
 el.executeBtn.addEventListener("click", executeAll);
 el.undoBtn.addEventListener("click", undoLast);
@@ -756,8 +877,10 @@ el.redoBtn.addEventListener("click", redoLast);
 
 checkSupport();
 loadRulesFromStorage();
+loadPresetsFromStorage();
 renderFolders();
 renderRules();
+renderPresets();
 renderPreview();
 updateUndoRedoButtons();
 log("換-KAN- を起動しました。フォルダとルールを登録してください。");
