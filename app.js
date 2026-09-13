@@ -16,6 +16,15 @@ const state = {
 let idCounter = 1;
 const nextId = () => String(idCounter++);
 
+// フォルダごとに割り当てる色相（登録順に巡回。削除しても色がずれないよう専用カウンタを使う）
+const FOLDER_HUES = [205, 20, 150, 280, 45, 335, 190, 100];
+let folderHueCounter = 0;
+function nextFolderHue() {
+  const hue = FOLDER_HUES[folderHueCounter % FOLDER_HUES.length];
+  folderHueCounter += 1;
+  return hue;
+}
+
 /* ---------- DOM参照 ---------- */
 const el = {
   unsupportedBanner: document.getElementById("unsupported-banner"),
@@ -79,6 +88,7 @@ async function addFolder() {
       includeSubfolders: false,
       depth: 0,
       invalid: false,
+      hue: nextFolderHue(),
     });
     log(`フォルダを追加: ${handle.name}`);
     renderFolders();
@@ -115,7 +125,12 @@ function renderFolders() {
 
     const nameSpan = document.createElement("span");
     nameSpan.className = "name";
-    nameSpan.textContent = folder.name;
+
+    const swatch = document.createElement("span");
+    swatch.className = "folder-swatch";
+    swatch.style.setProperty("--folder-hue", folder.hue);
+    nameSpan.appendChild(swatch);
+    nameSpan.appendChild(document.createTextNode(folder.name));
 
     if (folder.invalid) {
       const badge = document.createElement("span");
@@ -331,6 +346,7 @@ async function buildPreview() {
         state.preview.push({
           folderId: folder.id,
           folderName: folder.name,
+          folderHue: folder.hue,
           relPath: file.path,
           oldName: file.name,
           newName,
@@ -353,7 +369,7 @@ async function buildPreview() {
 function statusLabel(status) {
   switch (status) {
     case "pending": return "変更予定";
-    case "collision": return "衝突あり";
+    case "collision": return "既存あり";
     case "done": return "変更済み";
     case "error": return "失敗";
     default: return status;
@@ -368,56 +384,85 @@ function renderPreview() {
   let selectedCount = 0;
   let pendingCount = 0;
 
-  for (const item of state.preview) {
-    counts[item.status] = (counts[item.status] || 0) + 1;
-    if (item.status === "pending") {
-      pendingCount += 1;
-      if (item.selected) selectedCount += 1;
+  // フォルダ登録順にグルーピングして表示する（同じフォルダの行をまとめて見やすくする）
+  const groups = state.folders
+    .map((folder) => ({
+      folder,
+      items: state.preview.filter((item) => item.folderId === folder.id),
+    }))
+    .filter((g) => g.items.length > 0);
+
+  for (const group of groups) {
+    const hue = group.folder.hue;
+
+    const headerTr = document.createElement("tr");
+    headerTr.className = "preview-group-header";
+    const headerTd = document.createElement("td");
+    headerTd.colSpan = 5;
+    headerTd.style.setProperty("--folder-hue", hue);
+    const swatch = document.createElement("span");
+    swatch.className = "folder-swatch";
+    swatch.style.setProperty("--folder-hue", hue);
+    headerTd.appendChild(swatch);
+    headerTd.appendChild(document.createTextNode(group.folder.name));
+    headerTr.appendChild(headerTd);
+    el.previewBody.appendChild(headerTr);
+
+    for (const item of group.items) {
+      counts[item.status] = (counts[item.status] || 0) + 1;
+      if (item.status === "pending") {
+        pendingCount += 1;
+        if (item.selected) selectedCount += 1;
+      }
+
+      // 同じフォルダ内でも、階層が深いファイルほど少し明るい色合いにして階層感を出す
+      const depth = (item.relPath.match(/\//g) || []).length;
+      const rowLightness = Math.min(34, 16 + depth * 6);
+
+      const tr = document.createElement("tr");
+      tr.className = "preview-row";
+      tr.style.setProperty("--folder-hue", hue);
+      tr.style.setProperty("--row-lightness", `${rowLightness}%`);
+      if (item.status === "collision" || item.status === "error") tr.classList.add("status-collision");
+      if (item.status === "done") tr.classList.add("status-done");
+
+      const tdCheck = document.createElement("td");
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.checked = Boolean(item.selected);
+      checkbox.disabled = item.status !== "pending";
+      checkbox.setAttribute("aria-label", `${item.oldName} を実行対象に含める`);
+      checkbox.addEventListener("change", () => {
+        item.selected = checkbox.checked;
+        updateSelectAllCheckboxState();
+        updateExecuteButtonState();
+      });
+      tdCheck.appendChild(checkbox);
+
+      const tdOld = document.createElement("td");
+      tdOld.textContent = item.relPath;
+
+      const tdArrow = document.createElement("td");
+      tdArrow.textContent = "→";
+
+      const tdNew = document.createElement("td");
+      tdNew.textContent = item.newName;
+
+      const tdStatus = document.createElement("td");
+      const badge = document.createElement("span");
+      badge.className = "status-badge";
+      badge.textContent = statusLabel(item.status);
+      tdStatus.appendChild(badge);
+
+      tr.append(tdCheck, tdOld, tdArrow, tdNew, tdStatus);
+      el.previewBody.appendChild(tr);
     }
-
-    const tr = document.createElement("tr");
-    if (item.status === "collision" || item.status === "error") tr.classList.add("status-collision");
-    if (item.status === "done") tr.classList.add("status-done");
-
-    const tdCheck = document.createElement("td");
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.checked = Boolean(item.selected);
-    checkbox.disabled = item.status !== "pending";
-    checkbox.setAttribute("aria-label", `${item.oldName} を実行対象に含める`);
-    checkbox.addEventListener("change", () => {
-      item.selected = checkbox.checked;
-      updateSelectAllCheckboxState();
-      updateExecuteButtonState();
-    });
-    tdCheck.appendChild(checkbox);
-
-    const tdFolder = document.createElement("td");
-    tdFolder.textContent = item.folderName;
-
-    const tdOld = document.createElement("td");
-    tdOld.textContent = item.relPath;
-
-    const tdArrow = document.createElement("td");
-    tdArrow.textContent = "→";
-
-    const tdNew = document.createElement("td");
-    tdNew.textContent = item.newName;
-
-    const tdStatus = document.createElement("td");
-    const badge = document.createElement("span");
-    badge.className = "status-badge";
-    badge.textContent = statusLabel(item.status);
-    tdStatus.appendChild(badge);
-
-    tr.append(tdCheck, tdFolder, tdOld, tdArrow, tdNew, tdStatus);
-    el.previewBody.appendChild(tr);
   }
 
   const total = state.preview.length;
   el.previewSummary.textContent = total === 0
     ? "対象なし"
-    : `対象 ${total}件 / 変更可能 ${counts.pending}件（選択中 ${selectedCount}件）/ 衝突 ${counts.collision}件`;
+    : `対象 ${total}件 / 変更可能 ${counts.pending}件（選択中 ${selectedCount}件）/ 既存あり ${counts.collision}件`;
 
   updateSelectAllCheckboxState(pendingCount, selectedCount);
   updateExecuteButtonState();
@@ -529,7 +574,7 @@ async function undoBatch(batch) {
   for (const item of batch.items) {
     const collides = await fileExists(item.dirHandle, item.oldName);
     if (collides) {
-      log(`Undo不可（衝突）: ${item.newName} は元の名前に戻せません`, "error");
+      log(`Undo不可（既存あり）: ${item.newName} は元の名前に戻せません`, "error");
       continue;
     }
     try {
@@ -575,7 +620,7 @@ async function redoLast() {
   for (const item of batch.items) {
     const collides = await fileExists(item.dirHandle, item.newName);
     if (collides) {
-      log(`Redo不可（衝突）: ${item.oldName} は変更後の名前に進められません`, "error");
+      log(`Redo不可（既存あり）: ${item.oldName} は変更後の名前に進められません`, "error");
       continue;
     }
     try {

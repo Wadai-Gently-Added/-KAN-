@@ -257,6 +257,35 @@ tbody tr.status-done { color: var(--moss-500); }
   border: 1px solid currentColor;
 }
 
+/* ---------- フォルダの色分け ---------- */
+.folder-swatch {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: hsl(var(--folder-hue) 60% 55%);
+  margin-right: 7px;
+  flex-shrink: 0;
+}
+.item-row .name {
+  display: inline-flex;
+  align-items: center;
+}
+.preview-group-header td {
+  background: hsl(var(--folder-hue) 35% 16%);
+  color: hsl(var(--folder-hue) 45% 78%);
+  font-weight: 700;
+  font-size: 12px;
+  padding: 7px 10px;
+  border-bottom: 1px solid hsl(var(--folder-hue) 35% 26%);
+}
+.preview-row {
+  background: hsl(var(--folder-hue) 30% var(--row-lightness) / 0.45);
+}
+.preview-row td:first-child {
+  border-left: 3px solid hsl(var(--folder-hue) 55% 48%);
+}
+
 /* ---------- action bar ---------- */
 .action-bar {
   display: flex;
