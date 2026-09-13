@@ -245,6 +245,15 @@ body {
 .btn--reverse {
   color: var(--indigo-400);
 }
+
+.rule-warning {
+  font-size: 12px;
+  color: var(--clay-500);
+}
+.item-row.rule-conflict {
+  border-color: var(--clay-500);
+  background: rgba(181, 83, 60, 0.1);
+}
 .empty-note {
   font-size: 13px;
   opacity: 0.5;

@@ -1,4 +1,4 @@
-const CACHE_NAME = "kan-tool-v5"; // 更新のたびにここを上げると、古いキャッシュを確実に破棄できる
+const CACHE_NAME = "kan-tool-v6"; // 更新のたびにここを上げると、古いキャッシュを確実に破棄できる
 const ASSETS = ["./", "./index.html", "./styles.css", "./app.js", "./manifest.json"];
 
 self.addEventListener("install", (event) => {

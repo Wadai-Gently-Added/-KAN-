@@ -9,6 +9,7 @@ const state = {
   folders: [],   // { id, name, handle, enabled, includeSubfolders, depth }
   rules: [],     // { id, from, to }
   preview: [],   // 直近のプレビュー結果
+  previewNote: "", // プレビューが0件の時に表示する理由メッセージ
   history: [],   // 実行済みバッチのスタック（Undo用）
   redoStack: [], // Undoしたバッチのスタック（Redo用）
 };
@@ -79,7 +80,7 @@ function splitExt(filename) {
    ============================================ */
 async function addFolder() {
   try {
-    const handle = await window.showDirectoryPicker({ mode: "readwrite" });
+    const handle = await window.showDirectoryPicker({ mode: "readwrite", startIn: "downloads" });
     state.folders.push({
       id: nextId(),
       name: handle.name,
@@ -230,9 +231,30 @@ function ruleValidationMessage(rule) {
   const to = normalizeExt(rule.to);
   if (!from || !to) return "拡張子を入力してください";
   if (from === to) return "変換元と変換先が同じです";
-  const dup = state.rules.some((r) => r.id !== rule.id && normalizeExt(r.from) === from);
-  if (dup) return "同じ変換元のルールが既にあります";
+  if (rule.enabled) {
+    // 「有効」なルール同士でだけ重複を判定する。片方のチェックを外せば自動的に解消する。
+    const dup = state.rules.some((r) => r.id !== rule.id && r.enabled && normalizeExt(r.from) === from);
+    if (dup) return "同じ変換元の有効なルールが他にもあります";
+  }
   return "";
+}
+
+function ruleRowIssue(rule) {
+  if (!(rule.from || rule.to)) return "";
+  return ruleValidationMessage(rule);
+}
+
+function refreshRuleValidationDisplay() {
+  // 全体を再描画せず、警告文と色分けだけをその場で更新する（入力中のフォーカスを失わないため）
+  const rows = el.ruleList.querySelectorAll("li[data-rule-id]");
+  rows.forEach((li) => {
+    const rule = state.rules.find((r) => r.id === li.dataset.ruleId);
+    if (!rule) return;
+    const msg = ruleRowIssue(rule);
+    const warningEl = li.querySelector(".rule-warning");
+    if (warningEl) warningEl.textContent = msg;
+    li.classList.toggle("rule-conflict", Boolean(msg));
+  });
 }
 
 function renderRules() {
@@ -242,6 +264,7 @@ function renderRules() {
   for (const rule of state.rules) {
     const li = document.createElement("li");
     li.className = "item-row";
+    li.dataset.ruleId = rule.id;
 
     const enabledLabel = document.createElement("label");
     const enabledCheckbox = document.createElement("input");
@@ -251,6 +274,7 @@ function renderRules() {
     enabledCheckbox.addEventListener("change", () => {
       rule.enabled = enabledCheckbox.checked;
       saveRulesToStorage();
+      refreshRuleValidationDisplay();
     });
     enabledLabel.append(enabledCheckbox);
 
@@ -261,6 +285,7 @@ function renderRules() {
     fromInput.addEventListener("input", () => {
       rule.from = fromInput.value;
       saveRulesToStorage();
+      refreshRuleValidationDisplay();
     });
 
     const reverseBtn = document.createElement("button");
@@ -284,19 +309,20 @@ function renderRules() {
     toInput.addEventListener("input", () => {
       rule.to = toInput.value;
       saveRulesToStorage();
+      refreshRuleValidationDisplay();
     });
 
     const warning = document.createElement("span");
-    warning.style.fontSize = "12px";
-    warning.style.color = "var(--clay-500)";
-    const msg = ruleValidationMessage(rule);
-    warning.textContent = rule.from || rule.to ? msg : "";
+    warning.className = "rule-warning";
+    warning.textContent = ruleRowIssue(rule);
 
     const removeBtn = document.createElement("button");
     removeBtn.className = "btn--danger-text";
     removeBtn.type = "button";
     removeBtn.textContent = "削除";
     removeBtn.addEventListener("click", () => removeRule(rule.id));
+
+    if (ruleRowIssue(rule)) li.classList.add("rule-conflict");
 
     li.append(enabledLabel, fromInput, reverseBtn, toInput, warning, removeBtn);
     el.ruleList.appendChild(li);
@@ -360,7 +386,17 @@ async function buildPreview() {
   state.preview = [];
 
   const enabledFolders = state.folders.filter((f) => f.enabled);
+
+  if (state.rules.length > 0 && rules.length === 0) {
+    state.previewNote = "有効なルールがありません。同じ変換元のルールを複数チェックしていないか確認してください。";
+  } else if (enabledFolders.length === 0) {
+    state.previewNote = "対象のフォルダがありません。フォルダを追加してください。";
+  } else {
+    state.previewNote = "";
+  }
+
   if (enabledFolders.length === 0 || rules.length === 0) {
+    renderFolders();
     renderPreview();
     return;
   }
@@ -433,6 +469,10 @@ function statusLabel(status) {
 function renderPreview() {
   el.previewBody.innerHTML = "";
   el.previewEmpty.hidden = state.preview.length > 0;
+  if (state.preview.length === 0) {
+    el.previewEmpty.textContent =
+      state.previewNote || "フォルダとルールを登録して「プレビュー更新」を押してください。";
+  }
 
   const counts = { pending: 0, collision: 0, done: 0, error: 0 };
   let selectedCount = 0;
