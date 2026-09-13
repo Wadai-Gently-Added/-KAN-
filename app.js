@@ -85,8 +85,8 @@ async function addFolder() {
       name: handle.name,
       handle,
       enabled: true,
-      includeSubfolders: false,
-      depth: 0,
+      includeSubfolders: true,
+      depth: null, // null = 無制限
       invalid: false,
       hue: nextFolderHue(),
     });
